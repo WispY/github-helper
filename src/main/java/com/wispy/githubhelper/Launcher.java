@@ -57,7 +57,7 @@ public class Launcher {
         execute(local, "git checkout master");
         execute(local, "git merge merge-pull-request");
         execute(local, "git reset origin/master");
-        execute(local, String.format("git commit -a -m \"%s\" -m \"Closes #%s pull-request\" --author \"%s\"", message, requestNumber, requestAuthor));
+        execute(local, String.format("git commit -a -m \"%s\" -m \"Closes #%s\" --author \"%s\"", message, requestNumber, requestAuthor));
 
         execute(local, "git push origin master");
         execute(local, "git branch -D merge-pull-request");
