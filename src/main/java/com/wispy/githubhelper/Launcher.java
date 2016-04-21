@@ -16,7 +16,7 @@ public class Launcher {
         String organizationName = getArgument("GIT_ORGANIZATION", "GitHub organization name");
         String repositoryName = getArgument("GIT_REPOSITORY", "GitHub repository name");
         Integer requestNumber = getIntArgument("GIT_PULL_REQUEST_ID", "GitHub pull request id");
-        String home = getArgument("GIT_HOME", "Local repositories home");
+        String home = getArgument("LOCAL_REPO_PARENT_DIR", "Parent dir of your local repo, e.g. /home/user/projects)");
         String message = getArgument("GIT_MESSAGE", "GitHub pull request merge message");
 
         GitHub github = GitHub.connect();
@@ -37,7 +37,7 @@ public class Launcher {
             throw new IllegalStateException("Pull request is not mergeable");
         }
 
-        home = input(home, "local repositories home directory (without repository name, e.g. /home/user/Git)");
+        home = input(home, "Parent dir of your local repo, e.g. /home/user/projects");
         File local = new File(home + "/" + repository.getName());
         if (!local.isDirectory()) {
             throw new IllegalStateException("Specified local repository does not exist: " + local.getAbsolutePath());
