@@ -4,8 +4,8 @@ import org.kohsuke.github.*;
 
 import java.io.*;
 import java.net.URL;
-import java.util.Collection;
-import java.util.Scanner;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class Launcher {
     public static void main(String[] args) throws Exception {
@@ -24,6 +24,7 @@ public class Launcher {
 
         GHOrganization organization = getOrganization(github, organizationName);
         GHRepository repository = getRepository(organization, repositoryName);
+        String targetBranch = repository.getDefaultBranch(); // the branch we want to merge pull request into, in most cases this is 'master'
 
         GHPullRequest request = getPullRequest(repository, requestNumber);
         requestNumber = request.getNumber();
@@ -48,18 +49,23 @@ public class Launcher {
             message = request.getTitle();
         }
 
+        Set<String> remoteRepoNames = getRemoteRepoNames(local);
+        String targetRemoteRepo = remoteRepoNames.contains("upstream") ? "upstream" : "origin";
+        println("Target remote repo to push: " + targetRemoteRepo);
+
         execute(local, "git status");
         execute(local, "git pull --all");
 
-        execute(local, "git checkout -b merge-pull-request master");
+        execute(local, "git checkout -b merge-pull-request " + targetBranch);
         execute(local, "git pull " + requestSource + " " + requestRef);
 
-        execute(local, "git checkout master");
+        execute(local, "git checkout " + targetBranch);
         execute(local, "git merge merge-pull-request");
-        execute(local, "git reset origin/master");
+        execute(local, "git reset " + targetRemoteRepo + "/" + targetBranch);
+        execute(local, "git add .");
         execute(local, String.format("git commit -a -m \"%s\" -m \"Closes #%s\" --author \"%s\"", message, requestNumber, requestAuthor));
 
-        execute(local, "git push origin master");
+        execute(local, "git push " + targetRemoteRepo + " " + targetBranch);
         execute(local, "git branch -D merge-pull-request");
 
         request.close();
@@ -160,7 +166,7 @@ public class Launcher {
         System.out.print(string);
     }
 
-    private void execute(File workDirectory, String command) throws Exception {
+    private List<String> execute(File workDirectory, String command) throws Exception {
         println("--------------------------");
         println("Running: " + command);
         println("Directory: " + workDirectory.getAbsolutePath());
@@ -172,8 +178,10 @@ public class Launcher {
         int exitCode = process.waitFor();
         BufferedReader output = new BufferedReader(new InputStreamReader(process.getInputStream()));
         String line;
+        List<String> outputLines = new ArrayList<>();
         while ((line = output.readLine()) != null) {
             println(" - " + line);
+            outputLines.add(line);
         }
 
         BufferedReader error = new BufferedReader(new InputStreamReader(process.getErrorStream()));
@@ -183,5 +191,12 @@ public class Launcher {
         if (exitCode != 0) {
             throw new RuntimeException("Command '" + command + "' exited with code: " + exitCode);
         }
+
+        return outputLines;
+    }
+
+    private Set<String> getRemoteRepoNames(File workDir) throws Exception {
+        List<String> output = execute(workDir, "git remote -v");
+        return output.stream().map(line -> line.split("\\s")[0]).collect(Collectors.toSet());
     }
 }
