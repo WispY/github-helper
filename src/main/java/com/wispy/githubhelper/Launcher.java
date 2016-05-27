@@ -30,7 +30,7 @@ public class Launcher {
         requestNumber = request.getNumber();
         String requestSource = request.getHead().getRepository().getHtmlUrl().toString();
         String requestRef = request.getHead().getRef();
-        GitUser requestUser = request.getHead().getCommit().getCommitShortInfo().getCommitter();
+        GitUser requestUser = request.getBase().getCommit().getCommitShortInfo().getCommitter();
         String requestAuthor = requestUser.getName() + " <" + requestUser.getEmail() + ">";
         println("Pull request source: " + requestSource + " " + requestRef);
         println("Pull request author: " + requestAuthor);
