@@ -60,6 +60,8 @@ public class Launcher {
         execute(local, "git pull " + requestSource + " " + requestRef);
 
         execute(local, "git checkout " + targetBranch);
+        checkNoLocalChanges(local, targetBranch);
+
         execute(local, "git merge merge-pull-request");
         execute(local, "git reset " + targetRemoteRepo + "/" + targetBranch);
         execute(local, "git add .");
@@ -198,5 +200,15 @@ public class Launcher {
     private Set<String> getRemoteRepoNames(File workDir) throws Exception {
         List<String> output = execute(workDir, "git remote -v");
         return output.stream().map(line -> line.split("\\s")[0]).collect(Collectors.toSet());
+    }
+
+    private void checkNoLocalChanges(File workDirectory, String targetBranch) throws Exception {
+        List<String> output = execute(workDirectory, "git status");
+        // it prints 'working directory clean' on two lines, if more - there are untracked on changes to be commited
+        if (output.size() > 2) {
+            printError("");
+            printError("There are local changes in branch " + targetBranch + ". It's not safe to proceed. Exiting.");
+        }
+        System.exit(1);
     }
 }
