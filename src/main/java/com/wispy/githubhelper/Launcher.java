@@ -208,7 +208,7 @@ public class Launcher {
         if (output.size() > 2) {
             printError("");
             printError("There are local changes in branch " + targetBranch + ". It's not safe to proceed. Exiting.");
+            System.exit(1);
         }
-        System.exit(1);
     }
 }
