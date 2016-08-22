@@ -3,11 +3,14 @@ package com.wispy.githubhelper;
 import org.kohsuke.github.*;
 
 import java.io.*;
-import java.net.URL;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class Launcher {
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_RED = "\u001B[31m";
+
+
     public static void main(String[] args) throws Exception {
         new Launcher().run();
     }
@@ -60,7 +63,7 @@ public class Launcher {
         execute(local, "git pull " + requestSource + " " + requestRef);
 
         execute(local, "git checkout " + targetBranch);
-        checkNoLocalChanges(local, targetBranch);
+        checkNoLocalChangesOrStop(local, targetBranch);
 
         execute(local, "git merge merge-pull-request");
         execute(local, "git reset " + targetRemoteRepo + "/" + targetBranch);
@@ -161,7 +164,7 @@ public class Launcher {
     }
 
     private void printError(String string) {
-        System.err.println(string);
+        System.err.println(ANSI_RED + string + ANSI_RESET);
     }
 
     private void print(String string) {
@@ -188,7 +191,7 @@ public class Launcher {
 
         BufferedReader error = new BufferedReader(new InputStreamReader(process.getErrorStream()));
         while ((line = error.readLine()) != null) {
-            printError(" - " + line);
+            println(" - " + line);
         }
         if (exitCode != 0) {
             throw new RuntimeException("Command '" + command + "' exited with code: " + exitCode);
@@ -202,12 +205,13 @@ public class Launcher {
         return output.stream().map(line -> line.split("\\s")[0]).collect(Collectors.toSet());
     }
 
-    private void checkNoLocalChanges(File workDirectory, String targetBranch) throws Exception {
+    private void checkNoLocalChangesOrStop(File workDirectory, String targetBranch) throws Exception {
         List<String> output = execute(workDirectory, "git status");
-        // it prints 'working directory clean' on two lines, if more - there are untracked on changes to be commited
-        if (output.size() > 2) {
+        // it prints 'working directory clean' on two or three lines(on mac), if more - there are untracked on changes to be commited
+        if (output.size() > 3) {
             printError("");
             printError("There are local changes in branch " + targetBranch + ". It's not safe to proceed. Exiting.");
+            execute(workDirectory, "git branch -D merge-pull-request");
             System.exit(1);
         }
     }
