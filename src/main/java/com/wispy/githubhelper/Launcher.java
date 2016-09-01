@@ -27,9 +27,9 @@ public class Launcher {
 
         GHOrganization organization = getOrganization(github, organizationName);
         GHRepository repository = getRepository(organization, repositoryName);
-        String targetBranch = repository.getDefaultBranch(); // the branch we want to merge pull request into, in most cases this is 'master'
 
         GHPullRequest request = getPullRequest(repository, requestNumber);
+        String targetBranch = request.getBase().getRef(); // the branch we want to merge pull request into
         requestNumber = request.getNumber();
         String requestSource = request.getHead().getRepository().getHtmlUrl().toString();
         String requestRef = request.getHead().getRef();
@@ -37,6 +37,7 @@ public class Launcher {
         String requestAuthor = requestUser.getName() + " <" + requestUser.getEmail() + ">";
         println("Pull request source: " + requestSource + " " + requestRef);
         println("Pull request author: " + requestAuthor);
+        println("Pull request target branch: " + targetBranch);
         if (!request.getMergeable()) {
             throw new IllegalStateException("Pull request is not mergeable");
         }
@@ -56,24 +57,29 @@ public class Launcher {
         String targetRemoteRepo = remoteRepoNames.contains("upstream") ? "upstream" : "origin";
         println("Target remote repo to push: " + targetRemoteRepo);
 
-        execute(local, "git status");
-        execute(local, "git pull --all");
+        try {
+            execute(local, "git status");
+            execute(local, "git pull --all");
 
-        execute(local, "git checkout -b merge-pull-request " + targetBranch);
-        execute(local, "git pull " + requestSource + " " + requestRef);
+            execute(local, "git checkout -b merge-pull-request " + targetBranch);
+            execute(local, "git pull " + requestSource + " " + requestRef);
 
-        execute(local, "git checkout " + targetBranch);
-        checkNoLocalChangesOrStop(local, targetBranch);
+            execute(local, "git checkout " + targetBranch);
 
-        execute(local, "git merge merge-pull-request");
-        execute(local, "git reset " + targetRemoteRepo + "/" + targetBranch);
-        execute(local, "git add .");
-        execute(local, String.format("git commit -a -m \"%s\" -m \"Closes #%s\" --author \"%s\"", message, requestNumber, requestAuthor));
+            if (checkNoLocalChanges(local, targetBranch)) {
+                execute(local, "git merge merge-pull-request");
+                execute(local, "git reset " + targetRemoteRepo + "/" + targetBranch);
+                execute(local, "git add .");
+                execute(local, String.format("git commit -a -m \"%s\" -m \"Closes #%s\" --author \"%s\"", message, requestNumber, requestAuthor));
 
-        execute(local, "git push " + targetRemoteRepo + " " + targetBranch);
-        execute(local, "git branch -D merge-pull-request");
+                execute(local, "git push " + targetRemoteRepo + " " + targetBranch);
 
-        request.close();
+                request.close();
+            }
+
+        } finally {
+            execute(local, "git branch -D merge-pull-request");
+        }
     }
 
     private GHOrganization getOrganization(GitHub github, String organizationName) throws Exception {
@@ -205,14 +211,16 @@ public class Launcher {
         return output.stream().map(line -> line.split("\\s")[0]).collect(Collectors.toSet());
     }
 
-    private void checkNoLocalChangesOrStop(File workDirectory, String targetBranch) throws Exception {
+    private boolean checkNoLocalChanges(File workDirectory, String targetBranch) throws Exception {
         List<String> output = execute(workDirectory, "git status");
         // it prints 'working directory clean' on two or three lines(on mac), if more - there are untracked on changes to be commited
         if (output.size() > 3) {
             printError("");
             printError("There are local changes in branch " + targetBranch + ". It's not safe to proceed. Exiting.");
-            execute(workDirectory, "git branch -D merge-pull-request");
-            System.exit(1);
+            return false;
+        } else {
+            return true;
         }
+
     }
 }
